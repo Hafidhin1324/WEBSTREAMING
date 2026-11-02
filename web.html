@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HafidStream Premium V2</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.min.js"></script>
+
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #1e40af 0%, #3b82f6 40%, #93c5fd 80%, #f0f7ff 100%);
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --live-red: #ef4444;
+            --live-green: #10b981;
+            --text-dark: #0f172a;
+            --text-gray: #475569;
+            --glass-bg: rgba(255, 255, 255, 0.55);
+            --glass-border: rgba(255, 255, 255, 0.7);
+            --glass-shadow: 0 12px 40px 0 rgba(15, 23, 42, 0.15);
+            --bubble-bg: rgba(255, 255, 255, 0.8);
+            --bubble-border: rgba(255, 255, 255, 0.9);
+            --input-bg: #ffffff;
+            --scrollbar-thumb: #3b82f6;
+            --scrollbar-track: rgba(255, 255, 255, 0.3);
+
+            --plyr-color-main: #2563eb !important;
+            --plyr-video-control-color-hover: #ffffff !important;
+            --plyr-video-control-background-hover: #1d4ed8 !important;
+        }
+
+        [data-theme="dark"] {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e40af 40%, #1e3a8a 80%, #0f172a 100%);
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --live-red: #ef4444;
+            --live-green: #34d399;
+            --text-dark: #f8fafc;
+            --text-gray: #94a3b8;
+            --glass-bg: rgba(15, 23, 42, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.3);
+            --bubble-bg: rgba(255, 255, 255, 0.07);
+            --bubble-border: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(15, 23, 42, 0.8);
+            --scrollbar-thumb: #60a5fa;
+            --scrollbar-track: rgba(15, 23, 42, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0; padding: 0;
+            transition: background 0.3s, border-color 0.3s, color 0.3s;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-dark);
+            min-height: 100vh;
+            overflow-y: auto; overflow-x: hidden;
+            display: flex;
+        }
+
+        /* CUSTOM MODERN BLUE SCROLLBAR CHAT */
+        .msgs::-webkit-scrollbar {
+            width: 6px;
+        }
+        .msgs::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+            border-radius: 10px;
+        }
+        .msgs::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 10px;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+        .msgs::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-hover);
+        }
+
+        /* OVERRIDE PLYR UI SANGKAN FLOATING GLASS TRANSLUCENT */
+        .plyr {
+            border-radius: 24px !important;
+            overflow: hidden !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .plyr__controls {
+            position: absolute !important;
+            bottom: 14px !important;
+            left: 14px !important;
+            right: 14px !important;
+            background: rgba(15, 23, 42, 0.45) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            border-radius: 20px !important;
+            padding: 10px 16px !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+        }
+
+        /* OVERRIDE PLYR VOLUME SLIDER SANGKAN VERTIKAL */
+        .plyr__volume {
+            position: relative !important;
+        }
+
+        .plyr__volume input[type="range"] {
+            position: absolute !important;
+            bottom: 50px !important;
+            left: 50% !important;
+            transform: translateX(-50%) rotate(-90deg) !important;
+            transform-origin: center center !important;
+            width: 90px !important;
+            height: 28px !important;
+            padding: 6px !important;
+            background: rgba(15, 23, 42, 0.8) !important;
+            backdrop-filter: blur(14px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            border-radius: 12px !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            transition: opacity 0.2s ease !important;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4) !important;
+            z-index: 99 !important;
+        }
+
+        .plyr__volume:hover input[type="range"],
+        .plyr__volume input[type="range"]:focus {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 80px;
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border-right: 1px solid var(--glass-border);
+            display: flex; flex-direction: column; align-items: center;
+            padding: 30px 0; gap: 20px; flex-shrink: 0;
+            box-shadow: var(--glass-shadow);
+            position: fixed; top: 0; bottom: 0; left: 0; z-index: 100;
+        }
+        [data-theme="dark"] .sidebar { background: rgba(15, 23, 42, 0.6); }
+
+        .brand-logo {
+            width: 45px; height: 45px; background: var(--accent); border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 700; font-size: 20px; margin-bottom: 10px;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+
+        .side-icon {
+            width: 48px; height: 48px;
+            background: rgba(255, 255, 255, 0.5); border: 1px solid var(--glass-border); border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--text-gray); font-size: 20px; text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        [data-theme="dark"] .side-icon { background: rgba(255, 255, 255, 0.05); }
+        .side-icon:hover, .side-icon.active {
+            background: var(--accent); color: white; border-color: var(--accent);
+            transform: translateY(-2px); box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+        }
+
+        .main-content {
+            flex: 1; margin-left: 80px;
+            display: grid; grid-template-columns: 1fr 400px; gap: 25px; padding: 25px;
+        }
+
+        .video-section { display: flex; flex-direction: column; gap: 25px; }
+        .main-title-top { font-size: 28px; font-weight: 800; letter-spacing: -1px; color: var(--text-dark); padding: 5px 10px; }
+        .main-title-top span { color: var(--accent); }
+
+        .player-wrapper {
+            background: var(--glass-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            border-radius: 32px; padding: 24px; border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);
+        }
+
+        .player-box {
+            position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 24px; overflow: hidden;
+            box-shadow: 0 15px 45px rgba(0, 0, 0, 0.2);
+        }
+        .video-frame { width: 100%; height: 100%; border-radius: 24px; }
+
+        .badge {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            color: #fff; padding: 8px 16px; border-radius: 30px; font-size: 11px; font-weight: 700;
+            display: flex; align-items: center; gap: 8px; z-index: 10;
+            border: 1px solid rgba(255,255,255,0.2); letter-spacing: 0.5px;
+        }
+        .dot { width: 8px; height: 8px; background: var(--live-red); border-radius: 50%; animation: pulse 1.5s infinite; }
+
+        .modern-view-badge {
+            background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            padding: 8px 18px; border-radius: 20px; font-weight: 700; font-size: 14px; color: var(--text-dark);
+            border: 1px solid var(--glass-border); display: inline-flex; align-items: center; gap: 8px;
+        }
+        .live-dot-indicator { width: 8px; height: 8px; background: var(--live-red); border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
+
+        /* CHAT SECTION */
+        .chat-card {
+            background: var(--glass-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            border-radius: 32px; display: flex; flex-direction: column;
+            border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);
+            height: calc(100vh - 50px); position: sticky; top: 25px;
+        }
+
+        .chat-header {
+            padding: 24px; font-weight: 700; font-size: 15px; border-bottom: 1px solid var(--glass-border);
+            display: flex; justify-content: space-between; align-items: center; color: var(--text-dark);
+        }
+
+        .msgs { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+        .msg { display: flex; gap: 12px; animation: slideIn 0.3s ease-out; align-items: flex-start; }
+        .msg img { width: 36px; height: 36px; border-radius: 50% !important; object-fit: cover; flex-shrink: 0; }
+
+        .bubble {
+            background: var(--bubble-bg); padding: 12px 16px; border-radius: 20px;
+            border-top-left-radius: 4px; font-size: 13px; line-height: 1.5;
+            flex: 1; color: var(--text-dark); border: 1px solid var(--bubble-border);
+        }
+        .bubble b { color: var(--accent); font-size: 11px; display: block; margin-bottom: 4px; text-transform: uppercase; }
+
+        .input-area { padding: 20px; background: rgba(255, 255, 255, 0.35); border-top: 1px solid var(--glass-border); border-bottom-left-radius: 32px; border-bottom-right-radius: 32px; }
+        [data-theme="dark"] .input-area { background: rgba(0, 0, 0, 0.1); }
+        .chat-row { display: flex; gap: 12px; align-items: center; }
+
+        .chat-in {
+            flex: 1; background: var(--input-bg); border: 1px solid var(--glass-border);
+            padding: 12px 18px; border-radius: 16px; color: var(--text-dark);
+            outline: none; font-size: 13px; font-weight: 500;
+        }
+
+        .btn-send {
+            background: var(--accent); border: none; width: 44px; height: 44px; border-radius: 16px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;
+        }
+
+        .btn-upload {
+            background: var(--input-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-dark);
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+        .btn-upload:hover { background: var(--accent); color: white; }
+
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.6; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="brand-logo">H</div>
+    <a href="https://www.youtube.com/@hafidin3568" target="_blank" class="side-icon" title="YouTube Channel">📺</a>
+    <div style="margin-top: auto;" class="side-icon" id="themeToggleBtn" onclick="toggleTheme()">☀️</div>
+</div>
+
+<div class="main-content">
+    <div class="video-section">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="main-title-top">HafidStream <span>Premium V2</span></div>
+        </div>
+
+        <div class="player-wrapper">
+            <div class="player-box">
+                <div class="badge"><div class="dot"></div> LIVE HAFID HD</div>
+                <video id="player" class="video-frame" crossorigin playsinline></video>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; align-items: center; justify-content: space-between;">
+                <h2 style="margin:0; font-size: 20px; font-weight:700; color:var(--text-dark);">Siaran Langsung</h2>
+
+                <div class="modern-view-badge">
+                    <span class="live-dot-indicator"></span>
+                    <span id="viewCount">1.451.653</span> Penonton
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-card">
+        <div class="chat-header">
+            <span>Chat Utama</span>
+            <span style="font-size:11px; color:var(--live-green); font-weight:700;">● Aktif</span>
+        </div>
+
+        <div class="msgs" id="msgs"></div>
+
+        <div class="input-area">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                <img id="displayPP" src="https://ui-avatars.com/api/?name=Anonim&background=2563eb&color=fff" style="width:36px; height:36px; border-radius:50%; object-fit:cover;">
+
+                <input type="file" id="fileAvatarInput" accept="image/*" style="display:none;" onchange="handleGalleryUpload(event)">
+                <button type="button" class="btn-upload" onclick="document.getElementById('fileAvatarInput').click()">📷 Galeri</button>
+
+                <input type="text" id="uName" style="background:transparent; border:none; color:var(--text-dark); font-weight:700; outline:none; font-size:13px; width:100%;" placeholder="Ketik nama..." oninput="updateDefaultAvatar()">
+            </div>
+
+            <div class="chat-row">
+                <input type="text" id="chatIn" class="chat-in" placeholder="Ketik pesan...">
+                <button class="btn-send" onclick="sendMsg()">🚀</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SB_URL = 'https://ggvfeibnwzliyrxufslx.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdndmZlaWJud3psaXlyeHVmc2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1OTQ4NjUsImV4cCI6MjEwNDE3MDg2NX0.u_oawCXaHGBbo7ZI3S3bm1c5Qs7OKGS_M6yVh6KYN2M';
+    const sb = supabase.createClient(SB_URL, SB_KEY);
+
+    const liveStreamUrl = "https://hanky-caterer-aptly.ngrok-free.dev/hls/Gared.m3u8";
+    const video = document.getElementById('player');
+
+    // PLYR.IO INITIALIZATION
+    function initPlyrPlayer() {
+        const player = new Plyr(video, {
+            controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'],
+            autoplay: true,
+            muted: true
+        });
+
+        if (Hls.isSupported()) {
+            const hls = new Hls({ maxPixelRatio: 1, lowLatencyMode: true });
+            hls.loadSource(liveStreamUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                video.play().catch(() => {});
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = liveStreamUrl;
+            video.play().catch(() => {});
+        }
+    }
+
+    // AVATAR SYSTEM
+    const defaultAvatarUrl = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'Anonim')}&background=2563eb&color=fff`;
+    let isCustomAvatar = false;
+    let currentUserAvatar = defaultAvatarUrl('Anonim');
+
+    function updateDefaultAvatar() {
+        if (!isCustomAvatar) {
+            const user = document.getElementById('uName').value.trim() || 'Anonim';
+            currentUserAvatar = defaultAvatarUrl(user);
+            document.getElementById('displayPP').src = currentUserAvatar;
+        }
+    }
+
+    function handleGalleryUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                isCustomAvatar = true;
+                currentUserAvatar = e.target.result;
+                document.getElementById('displayPP').src = currentUserAvatar;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // COUNTER PENONTON
+    let currentViewers = 1451653;
+    function updateViewerCounter() {
+        currentViewers += Math.floor(Math.random() * 31) - 12;
+        document.getElementById('viewCount').innerText = currentViewers.toLocaleString('id-ID');
+        setTimeout(updateViewerCounter, Math.floor(Math.random() * 1000) + 1500);
+    }
+
+    // CHAT SYSTEM
+    function renderChat(d) {
+        if (!d || !d.content) return;
+        const box = document.getElementById('msgs');
+        const div = document.createElement('div');
+        div.className = 'msg';
+        const fallbackAvatar = defaultAvatarUrl(d.username || 'Anonim');
+
+        div.innerHTML = `
+            <img src="${d.avatar_url || fallbackAvatar}" onerror="this.src='${fallbackAvatar}'">
+            <div class="bubble">
+                <b>${d.username || 'Anonim'}</b>
+                ${d.content}
+            </div>
+        `;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    async function initLiveChat() {
+        const box = document.getElementById('msgs');
+        box.innerHTML = '<div style="text-align:center; font-size:12px; opacity:0.6;">Memuat chat...</div>';
+
+        const { data, error } = await sb.from('messages').select('*').order('id', { ascending: false }).limit(30);
+        box.innerHTML = '';
+
+        if (!error && data) {
+            data.reverse().forEach(renderChat);
+        }
+
+        sb.channel('public:messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+                renderChat(payload.new);
+            })
+            .subscribe();
+    }
+
+    async function sendMsg() {
+        const inEl = document.getElementById('chatIn');
+        const text = inEl.value.trim();
+        const user = document.getElementById('uName').value.trim() || 'Anonim';
+        if (!text) return;
+        inEl.value = '';
+
+        const finalAvatar = isCustomAvatar ? currentUserAvatar : defaultAvatarUrl(user);
+        await sb.from('messages').insert([{ username: user, content: text, avatar_url: finalAvatar }]);
+    }
+
+    function toggleTheme() {
+        const cur = document.documentElement.getAttribute('data-theme');
+        document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        initPlyrPlayer();
+        initLiveChat();
+        updateViewerCounter();
+    });
+
+    document.getElementById('chatIn').onkeypress = e => { if (e.key === 'Enter') sendMsg(); };
+</script>
+</body>
